@@ -47,7 +47,7 @@
                                     v-model="incomplete"
                                     switch
                                 >
-                                    Montrer les inscriptions non finies
+                                    Montrer les préinscriptions non confirmées
                                 </BFormCheckbox>
                             </BFormGroup>
                             <BFormGroup>
@@ -55,7 +55,7 @@
                                     v-model="pending"
                                     switch
                                 >
-                                    Inscriptions en attentes
+                                    Inscriptions en attentes (classes pleines)
                                 </BFormCheckbox>
                             </BFormGroup>
                             <BButton-group>
@@ -106,10 +106,12 @@
                                 >
                                     <template #cell(pdf)="data">
                                         <!-- Lien téléchargement du pdf -->
-                                        <a
-                                            :href="`${host}/subscribe/pdf/${data.item.uuid}/${data.item.validation.matricule}/`"  
+                                        <a 
+                                            v-if="data.item.validation?.matricule && data.item.validation?.matricule !== 'undefined'"
+                                            :href="`${host}/subscribe/pdf/${data.item.uuid}/${data.item.validation.matricule}`"  
                                             target="_blank"
                                             rel="noopener noreferrer"
+                                            title="Imprimer les documents à remplir"
                                         >
                                             <IBiFileEarmarkText />
                                         </a>
@@ -118,6 +120,7 @@
                                             :href="`${host}/subscribe/?edit=true#/options/${data.item.uuid}/`"
                                             target="_blank"
                                             rel="noopener noreferrer"
+                                            title="Modifier l'inscription"
                                         >
                                             <IBiPencilSquare />
                                         </a>
@@ -145,28 +148,10 @@
                                             En attente
                                             <span v-if="canValidate && isOptionFull(data.item.option.id, data.item.year)">
                                                 <IBiExclamationTriangleFill variant="warning" />
-                                                <BButton @click="confirmSubcription(data.item.uuid)">Valider</BButton>
+                                                <BButton @click="confirmSubcription(data.item.uuid)"
+                                                    title="Génération du matricule et réservation de la place">Valider</BButton>
                                             </span>
                                         </span>
-                                        <!-- Lien téléchargement du fichier .xls -->
-                                        <span v-else-if="data.item.validation">
-                                            {{ data.item.validation.matricule }}
-                                            <a
-                                                href="#"
-                                                @click="exportSubscription(data.item.uuid)"
-                                            >
-                                                <IBiBoxArrowUpRight />
-                                            </a>
-                                        </span>
-                                        <!-- Bouton rouge poubelle -->
-                                        <BButton
-                                            v-if="canValidate"
-                                            variant="danger"
-                                            size="sm"
-                                            @click="removeSubscription(data.item.uuid)"
-                                        >
-                                            <IBiTrash />
-                                        </BButton>
                                         <!-- Bouton orange marquer complet -->
                                         <span v-if="incomplete">
                                             <BButton
@@ -174,9 +159,31 @@
                                                 href="#"
                                                 variant="warning"
                                                 @click="markComplete(data.item)"
+                                                title="Forcer la confirmation de la préinscription"
                                             >
                                                 <IBiCheckAll />
                                             </BButton>
+                                        </span>
+                                        <!-- Bouton rouge poubelle -->
+                                        <BButton
+                                            v-if="canValidate"
+                                            variant="danger"
+                                            size="sm"
+                                            @click="removeSubscription(data.item.uuid)"
+                                            title="Supprimer l'inscription de la base de données"
+                                        >
+                                            <IBiTrash />
+                                        </BButton>
+                                        <!-- Lien téléchargement du fichier .xls -->
+                                        <span v-if="data.item.validation?.matricule && data.item.validation?.matricule !== 'undefined'">
+                                            {{ data.item.validation.matricule }}
+                                            <a
+                                                href="#"
+                                                @click="exportSubscription(data.item.uuid)"
+                                                title="Télécharger l'excel à exporter vers Proeco"
+                                            >
+                                                <IBiBoxArrowUpRight />
+                                            </a>
                                         </span>
                                     </template>
                                 </BTable>
@@ -377,11 +384,11 @@ export default {
                 },
                 {
                     key: "pdf",
-                    label: "",
+                    label: "Actions",
                 },
                 {
                     key: "validation",
-                    label: "Mat.",
+                    label: "Matr.",
                 },
             ],
             subscriptions: [],
@@ -407,12 +414,8 @@ export default {
         },
     },
     watch: {
-        incomplete: function () {
-            setTimeout(this.getSubscriptions(), 200);
-        },
-        pending: function () {
-            setTimeout(this.getSubscriptions(), 200);
-        },
+        incomplete() { this.getSubscriptions(); },
+        pending() { this.getSubscriptions(); },
     },
     mounted: function () {
         this.generateScholarYear();
@@ -627,7 +630,6 @@ export default {
 
             Promise.all(requests).then((resps) => {
                 let errors = [];
-                console.log(resps[0]);
                 const options = resps[0].data.results.map((o) => {
                     return {
                         id: o.option.id,
@@ -681,14 +683,14 @@ export default {
                     }/${this.scholarYear}/${this.pending}/${this.search}`,
                 )
                 .then((resp) => {
-                    if (this.searchId !== currentSearch)
-                        return;
+                    if (this.searchId !== currentSearch) return;
                     this.subscriptions = resp.data.results;
                     this.nextPage = resp.data.next;
-                    this.loading = false;
                 })
                 .catch((err) => {
                     console.log(err);
+                })
+                .finally(() => {
                     this.loading = false;
                 });
         },
