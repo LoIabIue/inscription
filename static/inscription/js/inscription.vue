@@ -198,7 +198,6 @@
                         </BCol>
                     </BRow>
                 </BTab>
-                <!--
                 <BTab
                     v-if="canValidate"
                     title="Réinscription"
@@ -206,7 +205,6 @@
                 >
                     <resubscribe />
                 </BTab>
-                -->
                 <template #tabs-end>
                     <BNavItem
                         :href="`https://inscription.idbbxl.com/subscribe/?from_user=${userName}`"
