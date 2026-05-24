@@ -515,6 +515,7 @@ class ExportInscriptionViewclass(View):
             "Papier/sms/mail",
             "Zone",
             "Besoin de FLE",
+            "Besoin am. rais.",
         ]
 
         # Father
@@ -866,6 +867,7 @@ class ExportInscriptionViewclass(View):
 
         start_date = f"2408{subscription_model.scholar_year[:4]}"
         datenaiss = subscription["student_info"]["birth_date"]
+        datevalidity = subscription["student_info"]["validity_id"]
 
         parsed_rentree = datetime.strptime(str(start_date), "%d%m%Y").date()
         parsed_naissce = datetime.strptime(str(datenaiss), "%Y-%m-%d").date()
@@ -884,7 +886,7 @@ class ExportInscriptionViewclass(View):
                 form,               # Fo = La forme d'enseignement (P, T, E, L, B, S)
                 channel,            # Fi = La filière (Q, T, P)
                 "",                 # Statut ?
-                subscription_model.matricule,
+                subscription_model.matricule,                                               # Numéro de registre
                 subscription["student"]["last_name"],                                       # Nom
                 subscription["student"]["first_name"],                                      # Prenom
                 self._country_to_proeco(subscription["student"]["nationality"]),            # Nationalite
@@ -894,7 +896,7 @@ class ExportInscriptionViewclass(View):
                 subscription["student_info"]["birth_place"],
                 subscription["student_info"]["identity_id"],
                 subscription["student_info"]["national_id"],
-                subscription.get("student_info", {}).get("validity_id", "-"),               # Date Validité
+                self._date_to_proeco(datevalidity),                                         # Date Validité
                 start_date,                                                                 # Date entree = Date debut = jour de la rentrée scolaire
                 start_date,                                                                 # Date 1ere entree = Date debut = jour de la rentrée scolaire
                 subscription["student"]["email"],
@@ -919,6 +921,7 @@ class ExportInscriptionViewclass(View):
                 "OOONONNNONNNNN",                                                           # Papier/sms/mail
                 "B",                                                                        # Zone
                 "O" if subscription.get("fle_needed") else "N",                             # Besoin de FLE
+                "O" if subscription.get("trouble_response") else "N",                       # Besoin am. rais.
             ]
             + data_father
             + data_mother
