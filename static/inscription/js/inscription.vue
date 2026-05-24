@@ -107,8 +107,7 @@
                                     <template #cell(pdf)="data">
                                         <!-- Lien téléchargement du pdf -->
                                         <a 
-                                            v-if="data.item.validation?.matricule && data.item.validation?.matricule !== 'undefined'"
-                                            :href="`${host}/subscribe/pdf/${data.item.uuid}/${data.item.validation.matricule}`"  
+                                            :href="`${host}/subscribe/pdf/${data.item.uuid}/${data.item.validation?.matricule ? data.item.validation.matricule : 'undefined'}`"  
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             title="Imprimer les documents à remplir"
