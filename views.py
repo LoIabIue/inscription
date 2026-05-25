@@ -896,7 +896,7 @@ class ExportInscriptionViewclass(View):
                 subscription["student_info"]["birth_place"],
                 subscription["student_info"]["identity_id"],
                 subscription["student_info"]["national_id"],
-                self._date_to_proeco(datevalidity),                                         # Date Validité
+                self._date_to_proeco(datevalidity) if datevalidity else "",                 # Date Validité
                 start_date,                                                                 # Date entree = Date debut = jour de la rentrée scolaire
                 start_date,                                                                 # Date 1ere entree = Date debut = jour de la rentrée scolaire
                 subscription["student"]["email"],
