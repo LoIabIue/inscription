@@ -758,10 +758,10 @@ class ExportInscriptionViewclass(View):
         elif subscription["responsible"] == "mother":
             resp_nom_prenom = f'{subscription["mother"]["last_name"]} { subscription["mother"]["first_name"]}'
             data_resp = data_mother.copy()
-            data_resp[-4] = "Madame" if not subscription["mother"] else "M. et Mme"
-            data_resp[-3] = (
+            data_resp[-4] = "Madame" if not subscription["father"] else "M. et Mme" # Titre resp
+            data_resp[-3] = (                                                       # Titre nom prenom resp
                 f"Madame {resp_nom_prenom}"
-                if not subscription["mother"]
+                if not subscription["father"]
                 else f"M. et Mme {resp_nom_prenom}"
             )
             data_resp.append("2")
@@ -915,7 +915,9 @@ class ExportInscriptionViewclass(View):
             orientation = "ELMEC"
         if orientation == "BOIS":
             orientation = "MEN"
-
+        if orientation == "MECA" and int(an[0]) == 5:
+            orientation = "MECAU"
+        
         # anfofi = f"{subscription['study_year']} {form}{channel}"
 
         student_id = self._get_matinfo(f"022{str(subscription_model.id).zfill(3)}")
