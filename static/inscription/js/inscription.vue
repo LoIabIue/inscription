@@ -220,6 +220,7 @@
             id="stats"
             ok-only
             size="lg"
+            @show="getStats"
         >
             <BListGroup>
                 <BListGroupItem>
@@ -617,60 +618,21 @@ export default {
                 });
         },
 
-        // Méthode préparant les données affichées sur clic sur le bouton gris "Statistiques"
+        // Méthode récupérant les données affichées sur clic sur le bouton gris "Statistiques"
+        // Données préparées dans la classe StatsAPI de views.py
         getStats: function () {
+            // console.log(`*** getStats - Appel de /inscription/api/stats/${this.scholarYear}`)
             this.optionErrors = [];
-            const requests = [
-                axios.get("/inscription/api/remote_server/subscribe/api/option_by_year/?page_size=100"),
-                axios.get(`/inscription/api/stats/${this.scholarYear}`),
-            ];
-
-            Promise.all(requests).then((resps) => {
-                let errors = [];
-                const options = resps[0].data.results.map((o) => {
-                    return {
-                        id: o.option.id,
-                        uid: `${o.option.id}_${o.study_year}`,
-                        name: o.option.option,
-                        year: o.study_year,
-                        form: o.option.form ? o.option.form.form : "",
-                        channel: o.option.channel ? o.option.channel.channel : "",
-                        count_sub: 0,
-                        count_resub: 0,
-                        max_students: o.max_students,
-                    };
-                });
-                Object.entries(resps[1].data["sub_count"]).forEach((entry) => {
-                    const index = options.findIndex(o => `${o.id}_${o.year}` === entry[0]);
-                    if (index < 0) {
-                        errors.push(entry[0].split("_"));
-                        return;
-                    }
-                    options[index].count_sub += entry[1];
-                });
-                Object.entries(resps[1].data["resub_count"]).forEach((entry) => {
-                    const index = options.findIndex(o => `${o.id}_${o.year}` === entry[0]);
-                    if (index < 0) {
-                        return;
-                    }
-                    options[index].count_resub += entry[1];
-                });
-                this.totalSubPerOption = options;
-
-                // Get subscriptions with errors
-                const promises = errors.map((e) => {
-                    return axios.get(`/inscription/api/inscription/?subscription__study_option__id=${e[0]}&subscription__study_year=${e[1]}&scholar_year=${this.scholarYear}&is_validated=True`);
-                });
-
-                Promise.all(promises)
-                    .then((resps) => {
-                        this.optionErrors = resps.map(r => r.data.results).flat();
-                    });
-            });
+            axios 
+                .get(`/inscription/api/stats/${this.scholarYear}`)
+                .then((resp) => {
+                    this.totalSubPerOption = resp.data.options;
+                    this.optionErrors = resp.data.errors; 
+                }) 
+                .catch((err) => { console.log(err); });
         },
         getSubscriptions: function () {
             this.loading = true;
-            this.getStats();
             this.searchId += 1;
             let currentSearch = this.searchId;
             axios

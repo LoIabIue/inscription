@@ -170,6 +170,7 @@ class HasInscriptionPermission(BasePermission):
         return request.user.has_perm("inscription.view_inscriptionsettingsmodel")
 
 
+# Génération de la liste d'inscriptions affichées sur la page 'Inscriptions'
 class SubscriptionAPI(APIView):
     permission_classes = [
         HasInscriptionPermission,
@@ -192,7 +193,8 @@ class SubscriptionAPI(APIView):
         pending = kwargs.get("pending") == "true"
         search = kwargs.get("search", "")
 
-        # Si 'pending' : va chercher les info dans InscriptionModel et retourne directement 'subscriptions'
+        # Si la liste a afficher est "Inscriptions en attentes (classes pleines)" : 
+        # chercher les données dans la DB HappySchool et retourner 'subscriptions'
         if pending:
             pending_sub = InscriptionModel.objects.filter(
                 pending=True, scholar_year=scholar_year
@@ -232,13 +234,13 @@ class SubscriptionAPI(APIView):
             ]
             return Response({"results": subscriptions, "next": None})
 
-        # Si pas 'pending' : demande les info au service d'inscription et retourne 'subscriptions'
+        # Si la liste à afficher est la liste principale (checkbox "Inscriptions en attentes (classes pleines) décochée") :
+        # demander les données dans la DB du module d'inscription et retourner 'subscriptions'
         big_page = "&page_size=400" if is_complete == "false" else ""
         r = requests.get(
             f"{self.host}/subscribe/api/subscriptionremote/?is_completed={is_complete}&search={search}&scholar_year={scholar_year}&page={page}&order{big_page}",
             headers={"Authorization": f"Token {settings.SUBSCRIBE_TOKEN}"},
         )
-
         data = r.json()
         subscriptions = [
             {
@@ -265,8 +267,6 @@ class SubscriptionAPI(APIView):
             for sub in data["results"]
             if sub["student"] and sub["student"]["last_name"]
         ]
-        # if pending:
-        # subscriptions = [sub for sub in subscriptions if sub["validation"] and sub["validation"]["pending"]]
         return Response({"results": subscriptions, "next": data["next"]})
 
 
@@ -288,7 +288,7 @@ class ValidationAPI(APIView):
         )
         return Response({"status": "done"})
 
-
+# Génération des statistiques affichées lors du clic sur le gros bouton gris 'Statistiques'
 class StatsAPI(APIView):
     permission_classes = [
         HasInscriptionPermission,
@@ -297,33 +297,94 @@ class StatsAPI(APIView):
 
     def get(self, request, *args, **kwargs):
         scholar_year = kwargs.get("scholar_year")
+
+        # -- Gestion des inscriptions de cette année --
+        # 1/ Récupération de la liste des inscriptions actuellement validées (DB HappySchool)
+        validated_inscriptions = InscriptionModel.objects.filter(
+            scholar_year=scholar_year,
+            is_validated=True,
+        )
+        validated_uuids = { str(insc.uuid) for insc in validated_inscriptions }
+        
+        # 2/ Récupération des données de la DB du module d'inscriptions
+        r = requests.get(
+            f"{self.host}/subscribe/api/subscriptionremote/"
+            f"?is_completed=true&scholar_year={scholar_year}&page_size=2000",
+            headers={"Authorization": f"Token {settings.SUBSCRIBE_TOKEN}"},
+        )
+        subscriptions_data = r.json()["results"]
+        
+        # 3/ Construction du compteur d'inscription sur base des 2 sets de données
         inscriptions = [
-            f'{insc.subscription["study_option"]["id"]}_{insc.subscription["study_year"]}'
-            for insc in InscriptionModel.objects.filter(
-                scholar_year=scholar_year, is_validated=True
+            f'{sub["study_option"]["id"]}_{sub["study_year"]}' 
+            for sub in subscriptions_data 
+            if ( 
+                str(sub["uuid"]) in validated_uuids 
+                and sub.get("study_option") 
             )
-        ]
-
-        insc_count = Counter(inscriptions)
-
+        ]   # ex : inscriptions = ['42_4', '42_4', '48_4']
+        insc_count = Counter(inscriptions)      # ex : insc_count = Counter({'42_4': 2, '48_4': 1})
+        
+        # -- Gestion des Réinscriptions --
+        # 1/ Récupération des données de la DB du module d'inscriptions
         r = requests.get(
             f"{self.host}/resubscribe/api/resubscriberemote/",
             headers={"Authorization": f"Token {settings.SUBSCRIBE_TOKEN}"},
         )
+        resub_data = r.json()["results"]
 
-        data = r.json()
-
-        resubscription = [
-            f'{resub["next_option"]}_{resub["next_year"]}'
-            for resub in data["results"]
-            if resub["next_option"]
-        ]
-
+        # 2/ Construction du compteur d'inscription sur base des données
+        resubscription = [ 
+            f'{resub["next_option"]}_{resub["next_year"]}' 
+            for resub in resub_data 
+            if resub["next_option"] ]
         resub_count = Counter(resubscription)
 
-        return Response(
-            {"sub_count": dict(insc_count), "resub_count": dict(resub_count)}
-        )
+        # -- Récupération des options -- 
+        r = requests.get( 
+            f"{self.host}/subscribe/api/option_by_year/?page_size=100", 
+            headers={"Authorization": f"Token {settings.SUBSCRIBE_TOKEN}"}, 
+        ) 
+        options_data = r.json()["results"]
+
+        # -- Construction de la réponse finale --
+        options = [] 
+        errors = []
+        for o in options_data: 
+            uid = f'{o["option"]["id"]}_{o["study_year"]}' 
+            count_sub = insc_count.get(uid, 0) 
+            count_resub = resub_count.get(uid, 0) 
+            options.append({ 
+                "id": o["option"]["id"], 
+                "uid": uid, 
+                "name": o["option"]["option"], 
+                "year": o["study_year"], 
+                "form": ( o["option"]["form"]["form"] if o["option"]["form"] else "" ), 
+                "channel": ( o["option"]["channel"]["channel"] if o["option"]["channel"] else "" ), 
+                "count_sub": count_sub, 
+                "count_resub": count_resub, 
+                "max_students": o["max_students"], 
+            })
+
+        # -- Détection des statistiques invalides --
+        existing_uids = { 
+            f'{o["option"]["id"]}_{o["study_year"]}' for o in options_data } 
+        invalid_entries = [ uid for uid in insc_count.keys() if uid not in existing_uids ] 
+        
+        for uid in invalid_entries: 
+            option_id, year = uid.split("_") 
+            invalid_subs = InscriptionModel.objects.filter( 
+                subscription__study_option__id=option_id, 
+                subscription__study_year=year, 
+                scholar_year=scholar_year, 
+                is_validated=True, 
+            ) 
+            errors.extend( 
+                InscriptionSerializer(invalid_subs, many=True).data 
+            )
+
+        # -- Retour final de toutes les données à afficher --
+        return Response({ "options": options, "errors": errors, })
 
 
 # Génération du fichier .pdf
