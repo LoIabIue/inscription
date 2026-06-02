@@ -106,7 +106,7 @@
                                 >
                                     <template #cell(pdf)="data">
                                         <!-- Lien téléchargement du pdf -->
-                                        <a 
+                                        <a v-if="! incomplete"
                                             :href="`${host}/subscribe/pdf/${data.item.uuid}/${data.item.validation?.matricule ? data.item.validation.matricule : 'undefined'}`"  
                                             target="_blank"
                                             rel="noopener noreferrer"
@@ -151,13 +151,13 @@
                                                     title="Génération du matricule et réservation de la place">Valider</BButton>
                                             </span>
                                         </span>
-                                        <!-- Bouton orange marquer complet -->
+                                        <!-- Bouton orange de confirmation de la préinscription -->
                                         <span v-if="incomplete">
                                             <BButton
                                                 size="sm"
                                                 href="#"
                                                 variant="warning"
-                                                @click="markComplete(data.item)"
+                                                @click="confirmMarkComplete(data.item)"
                                                 title="Forcer la confirmation de la préinscription"
                                             >
                                                 <IBiCheckAll />
@@ -325,6 +325,8 @@ import { useModalController } from "bootstrap-vue-next";
 
 import Resubscribe from "./reinscription.vue";
 
+import { h } from "vue";
+
 const token = { xsrfCookieName: "csrftoken", xsrfHeaderName: "X-CSRFToken" };
 
 export default {
@@ -432,6 +434,67 @@ export default {
         };
     },
     methods: {
+        getResponsibleEmail: function (item) {
+            const dump = item.dump || {};
+            const responsible = dump;
+
+            switch (dump.responsible) {
+            case "mother":
+                return dump.mother?.email || "";
+            case "father":
+                return dump.father?.email || "";
+            case "student":
+                return dump.student?.email || "";
+            case "other":
+                return dump.other_responsible?.email || "";
+            default:
+                return "";
+            }
+        },
+        confirmMarkComplete: function (item) {
+            // admin -> action directe
+            if (this.canValidate) {
+                this.markComplete(item);
+                return;
+            }
+
+            // utilisateur normal -> popup
+            const respEmail = this.getResponsibleEmail(item);
+            const editUrl = `${this.host}/subscribe/?edit=true#/options/${item.uuid}/`;
+
+            this.create({
+                title: "Confirmation requise",
+                centered: true,
+                okTitle: "Confirmer",
+                cancelTitle: "Annuler",
+                cancelVariant: "warning",
+                slots: {
+                    default: () => h("div", { class: "text-center"}, [
+                        h("p", [
+                            "Veuillez utilisez le lien fourni dans l'e-mail de confirmation envoyé à l'adresse ",
+                            h("strong", respEmail),
+                            " pour confirmer la préinscription."
+                        ]),
+                        h("p", "Si c'est impossible, vérifiez que l'adresse soit 100% correcte avant de forcer la validation."),
+                        h("p", {class: "text-danger fw-bold"}, 
+                            "Toute erreur dans cette adresse entraînera des soucis pendant l'année à venir !"),
+                    ]),
+                    footer: ({ ok }) =>
+                        h("div", { class: "d-flex justify-content-end gap-2" }, [
+                            h("a", { href: editUrl, target: "_blank", rel: "noopener noreferrer", class: "btn btn-outline-primary", },
+                                "Modifier l'inscription"
+                            ),
+                            h("button", {class: "btn btn-warning", onClick: ok, }, 
+                                "Confirmer la préinscription"),
+                        ]),
+                },
+            })
+            .then((result) => {
+                if (!result.ok) return;
+
+                this.markComplete(item);
+            });
+        },
         markComplete: function (item) {
             axios.post("/inscription/api/mark_complete/", { uuid: item.uuid }, token)
                 .then(() => {
