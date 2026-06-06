@@ -471,10 +471,9 @@ export default {
                 slots: {
                     default: () => h("div", { class: "text-center"}, [
                         h("p", [
-                            "Veuillez utilisez le lien fourni dans l'e-mail de confirmation envoyé à l'adresse ",
-                            h("strong", respEmail),
-                            " pour confirmer la préinscription."
+                            "Veuillez utilisez le lien fourni dans l'e-mail de confirmation envoyé à l'adresse ", h("strong", respEmail), " pour confirmer la préinscription."
                         ]),
+                        h("p", "(Pensez à vérifier le dossier des SPAMs !! S'il y est, marquez le mail comme étant légitime pour pouvoir cliquer sur le lien)"),
                         h("p", "Si c'est impossible, vérifiez que l'adresse soit 100% correcte avant de forcer la validation."),
                         h("p", {class: "text-danger fw-bold"}, 
                             "Toute erreur dans cette adresse entraînera des soucis pendant l'année à venir !"),
