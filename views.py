@@ -562,7 +562,6 @@ class ExportInscriptionViewclass(View):
             "localite",
             "Pays",
             "Integration",
-            "CPU",
             "Sante",
             "logopede",
             "sexe",
@@ -970,7 +969,6 @@ class ExportInscriptionViewclass(View):
                 subscription["student"]["address"]["locality"],
                 "BE",                                                                       # Pays
                 "O" if subscription["integration"] else "N",
-                "O" if "is_cpu" in subscription and subscription["is_cpu"] else "N",
                 subscription["health_comment"],                                             # Sante
                 "O" if subscription["speech_therapist"] else "N",                           # logopede
                 "F" if subscription["student_info"]["gender"] == "Femme" else "M",          # sexe
