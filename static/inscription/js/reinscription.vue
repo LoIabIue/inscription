@@ -86,7 +86,7 @@
                     <template #cell(actions)="data">
                         <BButton
                             size="sm"
-                            :href="`${host}/resubscribe/?edit=true#/${data.item.student_id}/2026_last_minute/`"
+                            :href="`${host}/resubscribe/?edit=true#/${data.item.student_id}/${data.item.random_key}/`"
                             target="_blank"
                             rel="noopener noreferrer"
                         >
