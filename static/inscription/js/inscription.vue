@@ -340,9 +340,10 @@ export default {
     data: function () {
         return {
             incomplete: false,
-            canValidate: false,
+            canValidate: true, // canValidate: false,        // TODO TEMPORAIRE : autorise tous les profs à finaliser l'inscription pour avoir le matricule
             // eslint-disable-next-line no-undef
-            host: remoteUrl,
+            //host: "http://0.0.0.0:8001",       // local
+            host: remoteUrl,          // production : http://host.docker.internal:8001
             search: "",
             searchId: 0,
             date_from: null,

@@ -916,6 +916,8 @@ class ExportInscriptionViewclass(View):
             orientation = "MEN"
         if orientation == "MECA" and int(an[0]) == 5:
             orientation = "MECAU"
+        if orientation == "ELTRO" and int(an[0]) == 4:
+            orientation = "ELECO"
         
         # anfofi = f"{subscription['study_year']} {form}{channel}"
 
