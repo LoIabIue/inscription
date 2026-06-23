@@ -58,9 +58,8 @@
                                     Inscriptions en attentes (classes pleines)
                                 </BFormCheckbox>
                             </BFormGroup>
-                            <BButton-group>
-                                <BButton
-                                    v-if="canValidate"
+                            <BButton-group v-if="canValidate">
+                                <BButton                                    
                                     v-b-modal.stats
                                 >
                                     Statistiques
@@ -92,7 +91,7 @@
                             </BFormGroup>
                         </BCol>
                     </BRow>
-                    <BRow>
+                    <BRow class="mt-2">
                         <BCol>
                             <BOverlay :show="loading">
                                 <BTable
@@ -105,6 +104,7 @@
                                     :tbody-tr-class="rowClass"
                                 >
                                     <template #cell(pdf)="data">
+                                        <span class="text-nowrap">
                                         <!-- Lien téléchargement du pdf -->
                                         <a v-if="! incomplete"
                                             :href="`${host}/subscribe/pdf/${data.item.uuid}/${data.item.validation?.matricule ? data.item.validation.matricule : 'undefined'}`"  
@@ -112,8 +112,8 @@
                                             rel="noopener noreferrer"
                                             title="Imprimer les documents à remplir"
                                         >
-                                            <IBiFileEarmarkText />
-                                        </a>
+                                            <IBiFileEarmarkText /> Impr
+                                        </a> <br/>
                                         <!-- Edition de l'inscription -->
                                         <a
                                             :href="`${host}/subscribe/?edit=true#/options/${data.item.uuid}/`"
@@ -121,12 +121,14 @@
                                             rel="noopener noreferrer"
                                             title="Modifier l'inscription"
                                         >
-                                            <IBiPencilSquare />
+                                            <IBiPencilSquare /> Modif
                                         </a>
-                                        <BFormCheckbox
+                                        </span>
+                                        <BFormCheckbox v-if="canValidate"
                                             :checked="data.item.validation ? true: false"
                                             @change="aknowledge($event, data.item)"
-                                        />
+                                        > &nbsp;Done
+                                        </BFormCheckbox>
                                     </template>
                                     <template #cell(validation)="data">
                                         <span v-if="!incomplete && (!data.item.validation || !data.item.validation.is_validated)">
@@ -139,13 +141,16 @@
                                                     <BButton @click="validateSubcription(data.item.uuid)">Valider</BButton>
                                                 </BButton-group>
                                             </span>
-                                            <span v-else-if="canValidate">
-                                                <BButton @click="validateSubcription(data.item.uuid)">Valider</BButton>
+                                            <!-- span span v-else-if="canValidate" -->
+                                            <span>
+                                                <BButton @click="validateSubcription(data.item.uuid)"
+                                                    title="Génération du matricule et réservation de la place">Valider</BButton>
                                             </span>
                                         </span>
                                         <span v-else-if="data.item.validation && data.item.validation.pending">
                                             En attente
-                                            <span v-if="canValidate && isOptionFull(data.item.option.id, data.item.year)">
+                                            <!-- span v-if="canValidate && isOptionFull(data.item.option.id, data.item.year)" -->
+                                            <span v-if="isOptionFull(data.item.option.id, data.item.year)">
                                                 <IBiExclamationTriangleFill variant="warning" />
                                                 <BButton @click="confirmSubcription(data.item.uuid)"
                                                     title="Génération du matricule et réservation de la place">Valider</BButton>
@@ -176,7 +181,7 @@
                                         <!-- Lien téléchargement du fichier .xls -->
                                         <span v-if="data.item.validation?.matricule && data.item.validation?.matricule !== 'undefined'">
                                             {{ data.item.validation.matricule }}
-                                            <a
+                                            <a v-if="canValidate"
                                                 href="#"
                                                 @click="exportSubscription(data.item.uuid)"
                                                 title="Télécharger l'excel à exporter vers Proeco"
@@ -340,7 +345,7 @@ export default {
     data: function () {
         return {
             incomplete: false,
-            canValidate: true, // canValidate: false,        // TODO TEMPORAIRE : autorise tous les profs à finaliser l'inscription pour avoir le matricule
+            canValidate: false,
             // eslint-disable-next-line no-undef
             //host: "http://0.0.0.0:8001",       // local
             host: remoteUrl,          // production : http://host.docker.internal:8001
@@ -422,6 +427,7 @@ export default {
         this.generateScholarYear();
         this.getSubscriptions();
         // eslint-disable-next-line no-undef
+        // this.canValidate = false;
         this.canValidate = canValidate;
 
         window.onscroll = () => {
