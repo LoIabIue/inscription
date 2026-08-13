@@ -363,14 +363,14 @@ export default {
                 {
                     key: "year",
                     label: "Future année",
-                    formatter: (value, _, item) => {
-                        return `${value} ${item.option.form ? item.option.form.form[0] : ""}${item.option.channel ? item.option.channel.channel[0] : ""}`;
+                    formatter: ({value, item}) => {
+                        return `${value} ${item.option?.form?.form?.[0] ?? ""}${item.option?.channel?.channel?.[0] ?? ""}`;
                     },
                 },
                 {
                     key: "option",
                     label: "Option",
-                    formatter: value => value.option,
+                    formatter: ({ value }) => value?.option ?? "-",
                 },
                 {
                     key: "date",
@@ -427,8 +427,8 @@ export default {
         this.generateScholarYear();
         this.getSubscriptions();
         // eslint-disable-next-line no-undef
-        // this.canValidate = false;
-        this.canValidate = canValidate;
+        this.canValidate = false;
+        // this.canValidate = canValidate;
 
         window.onscroll = () => {
             const { scrollTop, scrollHeight, clientHeight }
