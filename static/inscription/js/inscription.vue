@@ -58,7 +58,7 @@
                                     Inscriptions en attentes (classes pleines)
                                 </BFormCheckbox>
                             </BFormGroup>
-                            <BButton-group v-if="canValidate">
+                            <BButton-group v-if="canDelete">
                                 <BButton                                    
                                     v-b-modal.stats
                                 >
@@ -124,7 +124,7 @@
                                             <IBiPencilSquare /> Modif
                                         </a>
                                         </span>
-                                        <BFormCheckbox v-if="canValidate"
+                                        <BFormCheckbox v-if="canDelete"
                                             :checked="data.item.validation ? true: false"
                                             @change="aknowledge($event, data.item)"
                                         > &nbsp;Done
@@ -141,16 +141,14 @@
                                                     <BButton @click="validateSubcription(data.item.uuid)">Valider</BButton>
                                                 </BButton-group>
                                             </span>
-                                            <!-- span span v-else-if="canValidate" -->
-                                            <span>
+                                            <span v-else-if="canValidate">
                                                 <BButton @click="validateSubcription(data.item.uuid)"
                                                     title="Génération du matricule et réservation de la place">Valider</BButton>
                                             </span>
                                         </span>
                                         <span v-else-if="data.item.validation && data.item.validation.pending">
                                             En attente
-                                            <!-- span v-if="canValidate && isOptionFull(data.item.option.id, data.item.year)" -->
-                                            <span v-if="isOptionFull(data.item.option.id, data.item.year)">
+                                            <span v-if="canValidate && isOptionFull(data.item.option.id, data.item.year)">
                                                 <IBiExclamationTriangleFill variant="warning" />
                                                 <BButton @click="confirmSubcription(data.item.uuid)"
                                                     title="Génération du matricule et réservation de la place">Valider</BButton>
@@ -170,7 +168,7 @@
                                         </span>
                                         <!-- Bouton rouge poubelle -->
                                         <BButton
-                                            v-if="canValidate"
+                                            v-if="canDelete"
                                             variant="danger"
                                             size="sm"
                                             @click="removeSubscription(data.item.uuid)"
@@ -181,7 +179,7 @@
                                         <!-- Lien téléchargement du fichier .xls -->
                                         <span v-if="data.item.validation?.matricule && data.item.validation?.matricule !== 'undefined'">
                                             {{ data.item.validation.matricule }}
-                                            <a v-if="canValidate"
+                                            <a v-if="canDelete"
                                                 href="#"
                                                 @click="exportSubscription(data.item.uuid)"
                                                 title="Télécharger l'excel à exporter vers Proeco"
@@ -204,7 +202,7 @@
                     </BRow>
                 </BTab>
                 <BTab
-                    v-if="canValidate"
+                    v-if="canDelete"
                     title="Réinscription"
                     lazy
                 >
@@ -346,6 +344,7 @@ export default {
         return {
             incomplete: false,
             canValidate: false,
+            canDelete: false,
             // eslint-disable-next-line no-undef
             //host: "http://0.0.0.0:8001",       // local
             host: remoteUrl,          // production : http://host.docker.internal:8001
@@ -427,8 +426,8 @@ export default {
         this.generateScholarYear();
         this.getSubscriptions();
         // eslint-disable-next-line no-undef
-        this.canValidate = false;
-        // this.canValidate = canValidate;
+        this.canValidate = canValidate;
+        this.canDelete = canDelete;
 
         window.onscroll = () => {
             const { scrollTop, scrollHeight, clientHeight }
@@ -460,7 +459,7 @@ export default {
         },
         confirmMarkComplete: function (item) {
             // admin -> action directe
-            if (this.canValidate) {
+            if (this.canDelete) {
                 this.markComplete(item);
                 return;
             }

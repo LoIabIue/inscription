@@ -92,6 +92,9 @@ class InscriptionView(
         context["can_validate"] = json.dumps(
             self.request.user.has_perm("inscription.add_inscriptionmodel")
         )
+        context["can_delete"] = json.dumps(
+            self.request.user.has_perm("inscription.delete_inscriptionmodel")
+        )
         context["remote_url"] = json.dumps(settings.SUBSCRIBE_URL)
 
         return context
