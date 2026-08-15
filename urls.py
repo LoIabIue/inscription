@@ -26,6 +26,7 @@ from . import views
 urlpatterns = [
     path("", views.InscriptionView.as_view()),
     path("export/<uuid:subscription>/", views.ExportInscriptionViewclass.as_view()),
+    path("bulkexport/<matr_from>/<matr_to>/", views.ExportInscriptionViewclass.as_view()),
     path(
         "pdflist/<scholar_year>/<date_from>/<date_to>/<not_validated_only>/",
         views.ExportPDFInscription.as_view(),

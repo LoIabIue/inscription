@@ -188,13 +188,13 @@ class SubscriptionAPI(APIView):
 
     # Récupère la liste des inscriptions dans le backend et les retourne dans l'objet subscriptions
     def get(self, request, *args, **kwargs):
-        # print("=== [SubscriptionAPI.get]")
 
         page = kwargs.get("page")
         is_complete = kwargs.get("is_complete")
         scholar_year = kwargs.get("scholar_year")
         pending = kwargs.get("pending") == "true"
         search = kwargs.get("search", "")
+        ordering = request.GET.get("ordering", "")
 
         # Si la liste a afficher est "Inscriptions en attentes (classes pleines)" : 
         # chercher les données dans la DB HappySchool et retourner 'subscriptions'
@@ -239,12 +239,28 @@ class SubscriptionAPI(APIView):
 
         # Si la liste à afficher est la liste principale (checkbox "Inscriptions en attentes (classes pleines) décochée") :
         # demander les données dans la DB du module d'inscription et retourner 'subscriptions'
-        big_page = "&page_size=400" if is_complete == "false" else ""
+        if ordering in ("matricule", "-matricule"):
+            big_page = "&page_size=2000"
+        else:
+            big_page = "&page_size=400" if is_complete == "false" else ""
         r = requests.get(
-            f"{self.host}/subscribe/api/subscriptionremote/?is_completed={is_complete}&search={search}&scholar_year={scholar_year}&page={page}&order{big_page}",
+            f"{self.host}/subscribe/api/subscriptionremote/?is_completed={is_complete}&search={search}&scholar_year={scholar_year}&page={page}{big_page}",
             headers={"Authorization": f"Token {settings.SUBSCRIBE_TOKEN}"},
         )
         data = r.json()
+
+        # Récupère les matricules de toutes les inscriptions récupérées (en un unique appel)
+        uuids = [sub["uuid"] for sub in data["results"]]
+        validations = {
+            str(obj.uuid): InscriptionSerializer(obj).data
+            for obj in InscriptionModel.objects.filter(uuid__in=uuids)
+        }
+
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning("=== VALIDATION EXEMPLE : %s", next(iter(validations.values()), None))
+
+        # Mets en forme les données
         subscriptions = [
             {
                 "uuid": sub["uuid"],
@@ -265,11 +281,34 @@ class SubscriptionAPI(APIView):
                 ),
                 "is_completed": sub["is_completed"],
                 "dump": sub,
-                "validation": self._get_inscription_model(sub["uuid"]),
+                "validation": validations.get(sub["uuid"]),
             }
             for sub in data["results"]
             if sub["student"] and sub["student"]["last_name"]
         ]
+
+        # ordonne selon le matricule si demandé
+        if ordering in ("matricule", "-matricule"):
+            subscriptions_with_matricule = [
+                sub for sub in subscriptions
+                if sub["validation"] and sub["validation"]["matricule"]
+            ]
+
+            subscriptions_without_matricule = [
+                sub for sub in subscriptions
+                if not sub["validation"] or not sub["validation"]["matricule"]
+            ]
+
+            subscriptions_with_matricule.sort(
+                key=lambda sub: sub["validation"]["matricule"],
+                reverse=ordering == "matricule",
+            )
+
+            subscriptions = (
+                subscriptions_with_matricule
+                + subscriptions_without_matricule
+            )
+        
         return Response({"results": subscriptions, "next": data["next"]})
 
 
@@ -396,7 +435,6 @@ class ExportPDFInscription(WeasyTemplateView):
     host = settings.SUBSCRIBE_URL
 
     def get_context_data(self, **kwargs) -> dict:
-        # print("=== [ExportPDFInscription.get_context_data]")
         context = super().get_context_data(**kwargs)
         scholar_year = kwargs.get("scholar_year")
         date_from = kwargs.get("date_from")
@@ -515,24 +553,9 @@ class ExportInscriptionViewclass(View):
         # fdb_server = settings.SYNC_FDB_SERVER[0]["server"]
         # return reader.get_matricule_from_register_id(register_id, fdb_server)
 
-    # Génération du fichier .xls
-    def get(self, request, *args, **kwargs):
-        # print("=== [ExportInscriptionViewclass.get]")
-        uuid = kwargs["subscription"]
-        try:
-            subscription_model = InscriptionModel.objects.get(uuid=uuid)
-            subscription = subscription_model.subscription
-        except ObjectDoesNotExist:
-            # Class not found
-            return HttpResponse(status_code=404)
 
-        # print("*** subscription : ", subscription)
-
-        # Création d'un fichier .xls avec une feuille nommée 'data'
-        workbook = xlwt.Workbook()
-        worksheet = workbook.add_sheet("data")
-        # workbook = xlsxwriter.Workbook(output, {'in_memory': True})
-        # worksheet = workbook.add_worksheet()
+    def _prepare_inscription_data(self, subscription_model):
+        subscription = subscription_model.subscription
 
         # Données générales
         # - Titre colonnes
@@ -934,7 +957,7 @@ class ExportInscriptionViewclass(View):
 
         start_date = f"2408{subscription_model.scholar_year[:4]}"
         datenaiss = subscription["student_info"]["birth_date"]
-        datevalidity = subscription["student_info"]["validity_id"]
+        datevalidity = subscription["student_info"].get("validity_id")
 
         parsed_rentree = datetime.strptime(str(start_date), "%d%m%Y").date()
         parsed_naissce = datetime.strptime(str(datenaiss), "%Y-%m-%d").date()
@@ -943,6 +966,7 @@ class ExportInscriptionViewclass(View):
             age -= 1
         majormin = "+" if age >= 18 else "-"
 
+        
         # Création de l'objet contenant toutes les données de l'inscription, colonne après colonne
         data = (
             [
@@ -996,30 +1020,79 @@ class ExportInscriptionViewclass(View):
             + data_last_school
         )
 
-        # Préparation du la réponse : indique le type de réponse retournée (fichier text/csv)
-        response = HttpResponse(
-            content_type="text/csv",
-        )
-        # Préparation du la réponse : indique le nom du fichier retourné
-        last_name = (
-            unidecode(subscription["student"]["last_name"])
-            .lower()
-            .replace(" ", "-")
-            .replace("'", "")
-        )
-        first_name = (
-            unidecode(subscription["student"]["first_name"]).lower().replace(" ", "-")
-        )
-        response["Content-Disposition"] = (
-            f'attachment; filename="inscription_{last_name}_{first_name}.xls"'
-        )
-        # Écrit dans la première ligne de la feuille nommée 'data' les éléments de l'objet 'columns', case après case
-        for i, v in enumerate(columns):
-            worksheet.write(0, i, v)
-        # Écrit dans la deuxième ligne de la feuille nommée 'data' les éléments de l'objet 'data', case après case
-        for i, v in enumerate(data):
-            worksheet.write(1, i, v)
+        return columns, data
 
-        # Sauvegarde le document .xls dans la réponse et retourne celle-ci
+    # Création du fichier .xls
+    def _create_workbook(self, subscription_models):
+        # Création d'un fichier .xls avec une feuille nommée 'data'
+        workbook = xlwt.Workbook()
+        worksheet = workbook.add_sheet("data")
+
+        columns = None
+
+        # Pour chaque inscription listée dans le tableau fourni en paramètre...
+        for row, subscription_model in enumerate(subscription_models, start=1):
+
+            # Appel de la méthode préparant les données pour l'inscription courante
+            current_columns, data = self._prepare_inscription_data(subscription_model)
+
+            # Si on est au premier passage de la boucle, écrire les en-tête de colonnes
+            if columns is None:
+                columns = current_columns
+
+                for i, value in enumerate(columns):
+                    worksheet.write(0, i, value)
+
+            # Ecrire les données pour l'inscription courante
+            for i, value in enumerate(data):
+                worksheet.write(row, i, value)
+
+        return workbook
+    
+    # Appel intial pour la génération d'un fichier excel pour une inscription
+    def get(self, request, *args, **kwargs):
+
+        # Export individuel
+        if "subscription" in kwargs:
+            uuid = kwargs["subscription"]
+
+            # Récupération des données de base
+            try:
+                subscription_model = InscriptionModel.objects.get(uuid=uuid)
+            except ObjectDoesNotExist:
+                # Class not found
+                return HttpResponse(status_code=404)
+
+            # Appel de la méthode créant le fichier excel (contenant le 'tableau' subscription_model)
+            workbook = self._create_workbook([subscription_model])
+            response = HttpResponse(content_type="text/csv")
+            # Nom du fichier retourné :
+            subscription = subscription_model.subscription
+            last_name  = ( unidecode(subscription["student"]["last_name"]).lower().replace(" ", "-").replace("'", "") )
+            first_name = ( unidecode(subscription["student"]["first_name"]).lower().replace(" ", "-") )
+            response["Content-Disposition"] = (
+                f'attachment; filename="inscription_{last_name}_{first_name}.xls"'
+            )
+
+        # Export bulk
+        elif "matr_from" in kwargs and "matr_to" in kwargs:
+            matr_from = kwargs["matr_from"]
+            matr_to = kwargs["matr_to"]
+
+            # Récupération des données de base
+            subscriptions = InscriptionModel.objects.filter(
+                matricule__gte=matr_from,
+                matricule__lte=matr_to,
+            ).order_by("matricule")
+
+            # Appel de la méthode créant le fichier excel (contenant le tableau subscriptions)
+            workbook = self._create_workbook(subscriptions)
+            response = HttpResponse(content_type="text/csv")
+            # Nom du fichier retourné :
+            response["Content-Disposition"] = (
+                f'attachment; filename="inscriptions_{matr_from}_{matr_to}.xls"'
+            )
+
+        # Enregistrement + retour du document .xls rempli
         workbook.save(response)
         return response

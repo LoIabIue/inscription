@@ -71,6 +71,12 @@
                                     PDF
                                 </BButton>
                                 <BButton
+                                    v-b-modal.exportexcel
+                                    variant="outline-primary"
+                                >
+                                    Bulk Excel
+                                </BButton>
+                                <BButton
                                     v-b-modal.errors
                                     variant="outline-danger"
                                 >
@@ -103,6 +109,16 @@
                                     :fields="fields"
                                     :tbody-tr-class="rowClass"
                                 >
+                                    <template #head(validation)>
+                                        <span
+                                            style="cursor: pointer"
+                                            @click="sortByMatricule"
+                                        >
+                                            Matr.
+                                            <span v-if="sortMatricule === '-matricule'">▼</span>
+                                            <span v-else-if="sortMatricule === 'matricule'">▲</span>
+                                        </span>
+                                    </template>
                                     <template #cell(pdf)="data">
                                         <span class="text-nowrap">
                                         <!-- Lien téléchargement du pdf -->
@@ -318,6 +334,51 @@
                 </BCol>
             </BRow>
         </b-modal>
+        <b-modal
+            id="exportexcel"
+            title="Bulk Excel des inscriptions pour Proeco"
+            ok-only
+            @show="matr_from=scholarYear.slice(-3);matr_to=scholarYear.slice(-3);"
+            @hidden="matr_from=null;matr_to=null;"
+        >
+            <BRow>
+                <BCol>
+                    <BFormRow>
+                        <BFormGroup label="À partir du matricule :">
+                            <input
+                                v-model="matr_from"
+                                :max="matr_to"
+                                :placeholder="`${scholarYear.slice(-3)}...`"
+                            >
+                        </BFormGroup>
+                    </BFormRow>
+                </BCol>
+                <BCol>
+                    <BFormRow>
+                        <BFormGroup label="Jusqu'au matricule :">
+                            <input
+                                v-model="matr_to"
+                                :min="matr_from"
+                                :placeholder="`${scholarYear.slice(-3)}...`"
+                            >
+                        </BFormGroup>
+                    </BFormRow>
+                </BCol>
+            </BRow>
+            <BRow>
+                <BCol>
+                    <BButton
+                        variant="primary"
+                        :disabled="!matr_from || !matr_to"
+                        @click="bulkExportSubscription(matr_from,matr_to)"
+                        href="#"
+                        rel="noopener noreferrer"
+                    >
+                        Télécharger
+                    </BButton>
+                </BCol>
+            </BRow>
+        </b-modal>
     </div>
 </template>
 
@@ -352,6 +413,9 @@ export default {
             searchId: 0,
             date_from: null,
             date_to: null,
+            matr_from: null,
+            matr_to: null,
+            sortMatricule: null,
             scholarYear: "",
             scholarYearOptions: [],
             fields: [
@@ -673,7 +737,7 @@ export default {
                 });
         },
 
-        // Méthode générant/ouvrant le fichier .xls de l'inscription
+        // Méthode générant & téléchargeant le fichier .xls de l'inscription
         exportSubscription: function (uuid) {
             const sub = this.subscriptions.find(s => s.uuid === uuid);
             const data = {
@@ -684,6 +748,12 @@ export default {
                 .then(() => {
                     window.location.href = `/inscription/export/${uuid}/`;
                 });
+        },
+        // Méthode générant & téléchargeant le fichier .xls bulk de l'inscription
+        bulkExportSubscription: function (matr_from, matr_to) {
+            console.log("Export bulk :", matr_from, matr_to);
+            window.location.href =
+                `/inscription/bulkexport/${matr_from}/${matr_to}/`;
         },
 
         // Méthode récupérant les données affichées sur clic sur le bouton gris "Statistiques"
@@ -707,7 +777,7 @@ export default {
                 .get(
                     `/inscription/api/list/1/${
                         this.incomplete ? "false" : "true"
-                    }/${this.scholarYear}/${this.pending}/${this.search}`,
+                    }/${this.scholarYear}/${this.pending}/${this.search}?ordering=${this.sortMatricule || ""}`,
                 )
                 .then((resp) => {
                     if (this.searchId !== currentSearch) return;
@@ -720,6 +790,15 @@ export default {
                 .finally(() => {
                     this.loading = false;
                 });
+        },
+        sortByMatricule: function () {
+            if (this.sortMatricule === null || this.sortMatricule === "-matricule") {
+                this.sortMatricule = "matricule";
+            } else {
+                this.sortMatricule = "-matricule";
+            }
+
+            this.getSubscriptions();
         },
         generateScholarYear: function () {
             const currentYear = new Date().getFullYear();
