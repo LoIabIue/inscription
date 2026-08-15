@@ -592,47 +592,43 @@ export default {
             this.notsubPerOption = options;
         },
         removeSubscription: function (uuid) {
-            this.create({
-                body: "Êtes-vous sûr de vouloir supprimer définitevement l'inscription ?",
-                centered: true,
-                buttonSize: "sm",
-                okVariant: "danger",
-                okTitle: "Oui",
-                cancelTitle: "Annuler",
-            },
-            )
-                .then((remove) => {
-                    if (!remove.ok) return;
+            if (!window.confirm(
+                "Êtes-vous sûr de vouloir supprimer définitivement l'inscription ?"
+            )) {
+                return;
+            }
 
-                    this.loading = true;
-                    const subIndex = this.subscriptions.findIndex(
-                        s => s.uuid === uuid,
-                    );
-                    const validation = this.subscriptions[subIndex].validation;
-                    let promises = [];
-                    if (validation) {
-                        promises.push(
-                            axios.delete(
-                                (`/inscription/api/inscription/${validation.id}/`,
-                                token),
-                            ),
-                        );
-                    }
+            this.loading = true;
 
-                    const path = `subscribe/api/subscriptionremote/${this.subscriptions[subIndex].uuid}/`;
-                    promises.push(
-                        axios.delete(
-                            `/inscription/api/remote_server/${path}`,
-                            token,
-                        ),
-                    );
-                    Promise.all(promises)
-                        .then(() => {
-                            this.getSubscriptions();
-                        })
-                        .catch(() => {
-                            this.loading = false;
-                        });
+            const subIndex = this.subscriptions.findIndex(
+                s => s.uuid === uuid,
+            );
+            const validation = this.subscriptions[subIndex].validation;
+            let promises = [];
+            if (validation) {
+                promises.push(
+                    axios.delete(
+                        `/inscription/api/inscription/${validation.id}/`,
+                        token,
+                    ),
+                );
+            }
+
+            const path = `subscribe/api/subscriptionremote/${uuid}/`;
+            promises.push(
+                axios.delete(
+                    `/inscription/api/remote_server/${path}`,
+                    token,
+                ),
+            );
+
+            Promise.all(promises)
+                .then(() => {
+                    this.getSubscriptions();
+                })
+                .catch((err) => {
+                    console.log(err);
+                    this.loading = false;
                 });
         },
         validateSubcription: function (uuid) {
