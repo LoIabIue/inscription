@@ -140,11 +140,6 @@
                                             <IBiPencilSquare /> Modif
                                         </a>
                                         </span>
-                                        <BFormCheckbox v-if="canDelete"
-                                            :checked="data.item.validation ? true: false"
-                                            @change="aknowledge($event, data.item)"
-                                        > &nbsp;Done
-                                        </BFormCheckbox>
                                     </template>
                                     <template #cell(validation)="data">
                                         <span v-if="!incomplete && (!data.item.validation || !data.item.validation.is_validated)">
@@ -449,7 +444,7 @@ export default {
                 },
                 {
                     key: "other",
-                    label: "Resp.",
+                    label: "Autre resp.",
                 },
                 {
                     key: "pdf",
@@ -595,36 +590,6 @@ export default {
                 );
 
             this.notsubPerOption = options;
-        },
-        aknowledge: function (checked, sub) {
-            this.loading = true;
-            if (checked) {
-                const data = {
-                    uuid: sub.uuid,
-                    pending: false,
-                    is_validated: false,
-                    subscription: sub.dump,
-                    scholar_year: this.scholarYear,
-                };
-                axios.post("/inscription/api/inscription/", data, token)
-                    .then((resp) => {
-                        sub.validation = resp.data;
-                        this.loading = false;
-                    })
-                    .catch((err) => {
-                        console.log(err);
-                        this.loading = false;
-                    });
-            } else {
-                axios.delete(`/inscription/api/inscription/${sub.validation.id}/`, token)
-                    .then(() => {
-                        this.getSubscriptions();
-                    })
-                    .catch((err) => {
-                        console.log(err);
-                        this.loading = false;
-                    });
-            }
         },
         removeSubscription: function (uuid) {
             this.create({
