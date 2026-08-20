@@ -31,6 +31,8 @@ class InscriptionModel(models.Model):
     subscription = models.JSONField()
     pending = models.BooleanField(default=False)
     is_validated = models.BooleanField()
+    dossier_complet = models.BooleanField(default=False)
+    exporte_proeco = models.BooleanField(default=False)
     scholar_year = models.CharField(
         "Année scolaire",
         max_length=9,

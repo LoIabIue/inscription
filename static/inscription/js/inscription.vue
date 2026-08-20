@@ -139,6 +139,18 @@
                                         >
                                             <IBiPencilSquare /> Modif
                                         </a>
+                                        <BFormCheckbox v-if="canDelete && data.item.validation"
+                                            :checked="data.item.validation?.exporte_proeco === true"
+                                            @change="updateValidationField(data.item, 'exporte_proeco', $event.target.checked)"
+                                            title="Coché si l'export en Proeco est fait"
+                                        > Exporté
+                                        </BFormCheckbox>
+                                        <BFormCheckbox v-if="canDelete && data.item.validation"
+                                            :checked="data.item.validation?.dossier_complet === true"
+                                            @change="updateValidationField(data.item, 'dossier_complet', $event.target.checked)"
+                                            title="Coché si le dossier est 100% complet"
+                                        > Complet
+                                        </BFormCheckbox>
                                         </span>
                                     </template>
                                     <template #cell(validation)="data">
@@ -715,6 +727,22 @@ export default {
             console.log("Export bulk :", matr_from, matr_to);
             window.location.href =
                 `/inscription/bulkexport/${matr_from}/${matr_to}/`;
+        },
+
+        // Sauvegarde l'inscription (côté HappySchool) lorsque l'on clique sur 'exporté' ou 'complet'
+        updateValidationField: function (item, field, value) {
+            if (!item.validation) { console.error("Pas de validation pour cette inscription", item); return; }
+            const data = {
+                [field]: value,
+            };
+            axios
+                .patch(`/inscription/api/inscription/${item.validation.id}/`, data, token)
+                .then((resp) => {
+                    item.validation = resp.data;
+                })
+                .catch((err) => {
+                    console.log(err);
+                });
         },
 
         // Méthode récupérant les données affichées sur clic sur le bouton gris "Statistiques"

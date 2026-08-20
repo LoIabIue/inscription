@@ -256,10 +256,6 @@ class SubscriptionAPI(APIView):
             for obj in InscriptionModel.objects.filter(uuid__in=uuids)
         }
 
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.warning("=== VALIDATION EXEMPLE : %s", next(iter(validations.values()), None))
-
         # Mets en forme les données
         subscriptions = [
             {
@@ -429,7 +425,7 @@ class StatsAPI(APIView):
         return Response({ "options": options, "errors": errors, })
 
 
-# Génération du fichier .pdf
+# Génération d'un fichier .pdf contenant les inscriptions (bouton bleu 'PDF' sur le listing des inscriptions)
 class ExportPDFInscription(WeasyTemplateView):
     template_name = "inscription/pdflist.html"
     host = settings.SUBSCRIBE_URL
